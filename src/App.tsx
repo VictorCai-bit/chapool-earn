@@ -29,8 +29,13 @@ const T = {
     lockCpotTitle: '锁仓 CPOT',
     lockedSub: (expiry: string) => `已锁 5,000 CPOT · 解锁于 ${expiry}`,
     notLockedSub: '未锁仓',
-    moreLockBtn: '继续锁仓',
+    moreLockBtn: '新增锁仓',
     lockNowBtn: '立即锁仓',
+    unlockBtn: '解锁',
+    expiredLabel: '已到期',
+    unlocksOnLabel: '解锁于',
+    noLocksLabel: '未锁仓',
+    activeLocksLabel: (n: number) => `${n} 个仓位活跃`,
     nftTitle: 'NFT 加速',
     nftActiveSub: (n: number) => `持有 ${n} 个 CPNFT，已激活`,
     nftNoneSub: '持有 CPNFT 可再加速 +1.5%',
@@ -110,8 +115,13 @@ const T = {
     lockCpotTitle: 'Lock CPOT',
     lockedSub: (expiry: string) => `5,000 CPOT locked · Unlocks ${expiry}`,
     notLockedSub: 'Not locked yet',
-    moreLockBtn: 'Lock more',
+    moreLockBtn: 'Add lock',
     lockNowBtn: 'Lock now',
+    unlockBtn: 'Unlock',
+    expiredLabel: 'Expired',
+    unlocksOnLabel: 'Unlocks',
+    noLocksLabel: 'No active locks',
+    activeLocksLabel: (n: number) => `${n} active lock${n > 1 ? 's' : ''}`,
     nftTitle: 'NFT Boost',
     nftActiveSub: (n: number) => `${n} CPNFT active`,
     nftNoneSub: 'Hold CPNFT for +1.5% boost',
@@ -322,7 +332,7 @@ function LockSheet({
   lang: Lang
   currentVecpotBoost: number
   onClose: () => void
-  onSuccess: (duration: LockDuration, amount: number, boost: number) => void
+  onSuccess: (duration: LockDuration, amount: number) => void
 }) {
   const t = T[lang]
   const [step, setStep] = useState<'form' | 'confirm' | 'success'>('form')
@@ -333,7 +343,7 @@ function LockSheet({
   const newTotalApy = BASE_APY + currentVecpotBoost + boost
 
   const handleConfirm = () => {
-    onSuccess(duration, num, boost)
+    onSuccess(duration, num)
     setStep('success')
   }
 
@@ -465,8 +475,16 @@ function NftSheet({ lang, onClose }: { lang: Lang; onClose: () => void }) {
   )
 }
 
-// ── Types for history ────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 type HistoryItem = { icon: string; text: string; amount: string; time: string }
+type LockPos = {
+  id: number
+  amount: number
+  durationDays: LockDuration
+  unlockZh: string
+  unlockEn: string
+  expired: boolean
+}
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
@@ -476,9 +494,18 @@ export default function App() {
   // Simulated wallet state
   const [principal, setPrincipal] = useState(3200)
   const earned = 86.4
-  const [vecpotBoost, setVecpotBoost] = useState(3.5)
-  const [vecpotLocked] = useState(true)
-  const vecpotExpiry = lang === 'zh' ? '6月1日' : 'Jun 1'
+
+  // Multiple lock positions — each has its own duration and expiry
+  const [locks, setLocks] = useState<LockPos[]>([
+    { id: 1, amount: 5000, durationDays: 180, unlockZh: '6月1日', unlockEn: 'Jun 1', expired: false },
+    { id: 2, amount: 2000, durationDays: 30,  unlockZh: '3月20日', unlockEn: 'Mar 20', expired: true },
+  ])
+  const activeLocks = locks.filter((l) => !l.expired)
+  const maxDuration = activeLocks.length > 0
+    ? (Math.max(...activeLocks.map((l) => l.durationDays)) as LockDuration)
+    : 0
+  const vecpotBoost = maxDuration > 0 ? DURATION_BOOST[maxDuration] : 0
+
   const nftCount = 0
   const nftBoost = nftCount > 0 ? 1.5 : 0
   const currentApy = BASE_APY + vecpotBoost + nftBoost
@@ -516,8 +543,26 @@ export default function App() {
     }
   }
 
-  const handleLockSuccess = (_d: LockDuration, _n: number, boost: number) => {
-    setVecpotBoost((b) => +(b + boost).toFixed(1))
+  const handleLockSuccess = (duration: LockDuration, amount: number) => {
+    const newLock: LockPos = {
+      id: Date.now(),
+      amount,
+      durationDays: duration,
+      unlockZh: `${duration}天后`,
+      unlockEn: `${duration}d later`,
+      expired: false,
+    }
+    setLocks((prev) => [...prev, newLock])
+    setHistoryZh((h) => [{ icon: '🔒', text: '锁仓 CPOT', amount: `${amount.toLocaleString('en')} CPOT`, time: now() }, ...h])
+    setHistoryEn((h) => [{ icon: '🔒', text: 'Locked CPOT', amount: `${amount.toLocaleString('en')} CPOT`, time: now() }, ...h])
+  }
+
+  const handleUnlock = (lockId: number) => {
+    const lock = locks.find((l) => l.id === lockId)
+    if (!lock) return
+    setLocks((prev) => prev.filter((l) => l.id !== lockId))
+    setHistoryZh((h) => [{ icon: '🔓', text: '解锁 CPOT', amount: `${lock.amount.toLocaleString('en')} CPOT`, time: now() }, ...h])
+    setHistoryEn((h) => [{ icon: '🔓', text: 'Unlocked CPOT', amount: `${lock.amount.toLocaleString('en')} CPOT`, time: now() }, ...h])
   }
 
   const handleClaimCPP = () => {
@@ -604,12 +649,12 @@ export default function App() {
               <span className="apy-badge">{currentApy.toFixed(1)}%</span>
             </div>
 
-            {/* veCPOT */}
+            {/* veCPOT header row */}
             <div className="boost-row-card">
               <div className="boost-left">
                 <div className="boost-title">{t.lockCpotTitle}</div>
                 <div className="boost-sub">
-                  {vecpotLocked ? t.lockedSub(vecpotExpiry) : t.notLockedSub}
+                  {activeLocks.length === 0 ? t.noLocksLabel : t.activeLocksLabel(activeLocks.length)}
                 </div>
               </div>
               <div className="boost-right">
@@ -617,10 +662,35 @@ export default function App() {
                   {vecpotBoost > 0 ? `+${vecpotBoost.toFixed(1)}%` : '+0%'}
                 </span>
                 <button className="mini-btn" onClick={() => setSheet('lock')}>
-                  {vecpotLocked ? t.moreLockBtn : t.lockNowBtn}
+                  {activeLocks.length > 0 ? t.moreLockBtn : t.lockNowBtn}
                 </button>
               </div>
             </div>
+
+            {/* Lock position list */}
+            {locks.length > 0 && (
+              <div className="lock-list">
+                {locks.map((lock) => (
+                  <div className="lock-item" key={lock.id}>
+                    <div className="lock-item-info">
+                      <span className="lock-item-amount">{lock.amount.toLocaleString('en')} CPOT</span>
+                      <span className="lock-item-meta">
+                        {lock.expired
+                          ? t.expiredLabel
+                          : `${t.unlocksOnLabel} ${lang === 'zh' ? lock.unlockZh : lock.unlockEn}`}
+                      </span>
+                    </div>
+                    <button
+                      className={`unlock-btn ${lock.expired ? 'ready' : 'pending'}`}
+                      onClick={() => lock.expired && handleUnlock(lock.id)}
+                      disabled={!lock.expired}
+                    >
+                      {lock.expired ? t.unlockBtn : (lang === 'zh' ? lock.unlockZh : lock.unlockEn)}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="boost-divider" />
 
@@ -707,7 +777,7 @@ export default function App() {
           lang={lang}
           currentVecpotBoost={vecpotBoost}
           onClose={closeSheet}
-          onSuccess={handleLockSuccess}
+          onSuccess={(d, n) => handleLockSuccess(d, n)}
         />
       </BottomSheet>
 
