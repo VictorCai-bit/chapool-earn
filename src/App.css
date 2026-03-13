@@ -681,6 +681,11 @@
   line-height: 1.6;
 }
 
+.muted-val {
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
 /* ── Success state ──────────────────────────────────────────────────────────── */
 .success-icon {
   width: 60px;

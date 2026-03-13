@@ -2,8 +2,10 @@ import { useState } from 'react'
 import './App.css'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const BASE_APY = 8.0
+// Simulated: base CPP earned per 1 USDT per day (at no boost)
+const BASE_CPP_PER_USDT_DAY = 0.1   // e.g. 100 USDT → 10 CPP/day
 const DURATION_BOOST: Record<number, number> = { 30: 1.0, 90: 2.0, 180: 3.5, 360: 5.0 }
+const NFT_BOOST_BPS = 150           // +1.5% for demo NFT
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Sheet = null | 'deposit' | 'lock' | 'nft'
@@ -16,18 +18,17 @@ const T = {
   zh: {
     header: '理财',
     lang: 'EN',
-    totalLabel: '总资产',
-    apyLabel: '年化',
+    depositLabel: 'USDT 存款',
+    dailyCppLabel: '预计日收益',
     depositBtn: '存入 USDT',
     withdrawBtn: '取出',
-    positionTitle: '我的存款',
-    principalLabel: '本金',
-    earnedLabel: '已赚',
+    positionTitle: '我的收益',
     liquidityLabel: '流动性',
     liquidityVal: '活期，随时可取',
+    cppRefLabel: 'CPP 参考价',
+    cppRefVal: '1 CPP = 0.002 USDT',
     boostTitle: '收益加速',
     lockCpotTitle: '锁仓 CPOT',
-    lockedSub: (expiry: string) => `已锁 5,000 CPOT · 解锁于 ${expiry}`,
     notLockedSub: '未锁仓',
     moreLockBtn: '新增锁仓',
     lockNowBtn: '立即锁仓',
@@ -37,14 +38,14 @@ const T = {
     noLocksLabel: '未锁仓',
     activeLocksLabel: (n: number) => `${n} 个仓位活跃`,
     nftTitle: 'NFT 加速',
-    nftActiveSub: (n: number) => `持有 ${n} 个 CPNFT，已激活`,
-    nftNoneSub: '持有 CPNFT 可再加速 +1.5%',
+    nftActiveSub: '已激活 CPNFT 加速',
+    nftNoneSub: '激活 CPNFT 可再加速',
     activateNftBtn: '激活加速',
     getNftBtn: '获取 NFT',
-    baseApyLabel: '基础年化',
-    vecpotBoostLabel: 'veCPOT 加速',
+    baseWeightLabel: '基础权重',
+    vecpotBoostLabel: 'CPOT 加速',
     nftBoostLabel: 'NFT 加速',
-    currentApyLabel: '当前年化',
+    multiplierLabel: '综合倍率',
     historyTitle: '最近记录',
     pendingCppLabel: '待领取 CPP',
     claimCppBtn: '领取',
@@ -62,8 +63,7 @@ const T = {
     withdrawTab: '取出',
     allDeposit: '全部 5,000',
     allWithdraw: (n: number) => `全部 ${n.toLocaleString('en')}`,
-    youGet: '你将获得',
-    estApy: '当前年化',
+    estDailyCpp: '预计日收益',
     flexible: '活期，随时可取',
     youGetBack: '你将取回',
     estArrival: '预计到账',
@@ -72,15 +72,15 @@ const T = {
     confirmWithdraw: '确认取出',
     depositSuccess: '存入成功',
     withdrawSuccess: '已发起取出',
-    depositSuccessBody: (n: number) => `已存入 ${n.toLocaleString('en')} USDT，收益从明天开始计算。`,
+    depositSuccessBody: (n: number) => `已存入 ${n.toLocaleString('en')} USDT，CPP 奖励实时累积，随时可领取。`,
     withdrawSuccessBody: '取出申请已提交，通常 T+0 到账。',
     done: '完成',
     // lock sheet
-    lockTitle: '锁 CPOT 提升年化',
-    lockDesc: '锁仓时间越长，年化加成越高。到期自动解锁，CPOT 原路退回。',
+    lockTitle: '锁 CPOT 提升 CPP 收益',
+    lockDesc: '锁仓时间越长，收益加速倍率越高。到期自动解锁，CPOT 原路退回。',
     allCpot: '全部 12,000',
-    addedBoost: '本次新增加速',
-    newApy: '锁仓后年化',
+    addedBoost: '本次加速',
+    newMultiplier: '锁仓后倍率',
     lockNext: '下一步',
     confirmLock: '确认锁仓',
     backEdit: '返回修改',
@@ -90,30 +90,30 @@ const T = {
     lockDuration: '锁仓时长',
     lockSuccess: '锁仓成功',
     lockSuccessBody: (n: number, d: number) => `已锁 ${n.toLocaleString('en')} CPOT，锁期 ${d} 天`,
-    lockSuccessApy: (apy: number) => `你的 Earn 年化已提升至 ${apy.toFixed(1)}%`,
-    alreadyBoost: '已有锁仓加速',
+    lockSuccessBoost: (m: string) => `你的收益倍率已提升至 ${m}`,
+    alreadyBoost: '当前加速',
     durationLabels: { 30: '30天', 90: '90天', 180: '180天', 360: '360天' } as Record<number, string>,
     // nft sheet
     nftSheetTitle: '如何获得 NFT 加速',
-    nftSheetBody: '持有 Chapool CPNFT 即可自动激活 +1.5% 年化加速。NFT 可在 Marketplace 购买，或参与平台活动获取。',
+    nftSheetBody: '激活未质押的 Chapool CPNFT 即可获得额外 CPP 收益加速。NFT 可在 Marketplace 购买，或参与平台活动获取。',
+    nftStakedNote: '注意：正在质押的 NFT 无法激活 Earn 加速（避免双重收益）。',
     goMarketplace: '去 Marketplace',
     close: '关闭',
   },
   en: {
     header: 'Earn',
     lang: '中文',
-    totalLabel: 'Total Assets',
-    apyLabel: 'APY',
+    depositLabel: 'USDT Deposited',
+    dailyCppLabel: 'Est. daily CPP',
     depositBtn: 'Deposit USDT',
     withdrawBtn: 'Withdraw',
-    positionTitle: 'My Position',
-    principalLabel: 'Principal',
-    earnedLabel: 'Earned',
+    positionTitle: 'My Rewards',
     liquidityLabel: 'Liquidity',
-    liquidityVal: 'Flexible',
-    boostTitle: 'Yield Boost',
+    liquidityVal: 'Flexible, withdraw anytime',
+    cppRefLabel: 'CPP reference',
+    cppRefVal: '1 CPP = $0.002',
+    boostTitle: 'Boost',
     lockCpotTitle: 'Lock CPOT',
-    lockedSub: (expiry: string) => `5,000 CPOT locked · Unlocks ${expiry}`,
     notLockedSub: 'Not locked yet',
     moreLockBtn: 'Add lock',
     lockNowBtn: 'Lock now',
@@ -123,14 +123,14 @@ const T = {
     noLocksLabel: 'No active locks',
     activeLocksLabel: (n: number) => `${n} active lock${n > 1 ? 's' : ''}`,
     nftTitle: 'NFT Boost',
-    nftActiveSub: (n: number) => `${n} CPNFT active`,
-    nftNoneSub: 'Hold CPNFT for +1.5% boost',
+    nftActiveSub: 'CPNFT boost active',
+    nftNoneSub: 'Activate CPNFT for extra boost',
     activateNftBtn: 'Activate',
     getNftBtn: 'Get NFT',
-    baseApyLabel: 'Base APY',
-    vecpotBoostLabel: 'veCPOT boost',
+    baseWeightLabel: 'Base weight',
+    vecpotBoostLabel: 'CPOT boost',
     nftBoostLabel: 'NFT boost',
-    currentApyLabel: 'Current APY',
+    multiplierLabel: 'Total multiplier',
     historyTitle: 'Recent',
     pendingCppLabel: 'Pending CPP',
     claimCppBtn: 'Claim',
@@ -147,8 +147,7 @@ const T = {
     withdrawTab: 'Withdraw',
     allDeposit: 'Max 5,000',
     allWithdraw: (n: number) => `Max ${n.toLocaleString('en')}`,
-    youGet: 'You receive',
-    estApy: 'Current APY',
+    estDailyCpp: 'Est. daily CPP',
     flexible: 'Flexible, withdraw anytime',
     youGetBack: 'You get back',
     estArrival: 'Arrival',
@@ -157,14 +156,14 @@ const T = {
     confirmWithdraw: 'Confirm withdraw',
     depositSuccess: 'Deposited',
     withdrawSuccess: 'Withdraw submitted',
-    depositSuccessBody: (n: number) => `${n.toLocaleString('en')} USDT deposited. Yield starts tomorrow.`,
+    depositSuccessBody: (n: number) => `${n.toLocaleString('en')} USDT deposited. CPP rewards accrue in real-time.`,
     withdrawSuccessBody: 'Withdrawal submitted. Usually arrives T+0.',
     done: 'Done',
-    lockTitle: 'Lock CPOT for higher yield',
-    lockDesc: 'Longer lock = higher boost. Auto-unlocked at expiry, CPOT returned.',
+    lockTitle: 'Lock CPOT to boost CPP rewards',
+    lockDesc: 'Longer lock = higher multiplier. Auto-unlocked at expiry, CPOT returned.',
     allCpot: 'Max 12,000',
     addedBoost: 'Boost added',
-    newApy: 'APY after lock',
+    newMultiplier: 'Multiplier after lock',
     lockNext: 'Next',
     confirmLock: 'Confirm lock',
     backEdit: 'Edit',
@@ -174,11 +173,12 @@ const T = {
     lockDuration: 'Duration',
     lockSuccess: 'Locked',
     lockSuccessBody: (n: number, d: number) => `${n.toLocaleString('en')} CPOT locked for ${d} days`,
-    lockSuccessApy: (apy: number) => `Your Earn APY is now ${apy.toFixed(1)}%`,
+    lockSuccessBoost: (m: string) => `Your reward multiplier is now ${m}`,
     alreadyBoost: 'Current boost',
     durationLabels: { 30: '30d', 90: '90d', 180: '180d', 360: '360d' } as Record<number, string>,
     nftSheetTitle: 'How to get NFT boost',
-    nftSheetBody: 'Hold a Chapool CPNFT to auto-activate +1.5% APY boost. Get NFTs on Marketplace or through platform events.',
+    nftSheetBody: 'Activate an unstaked Chapool CPNFT for extra CPP reward boost. Get NFTs on Marketplace or through platform events.',
+    nftStakedNote: 'Note: NFTs currently staked cannot be activated for Earn boost (no double-dipping).',
     goMarketplace: 'Open Marketplace',
     close: 'Close',
   },
@@ -209,13 +209,13 @@ function BottomSheet({
 function DepositSheet({
   lang,
   currentPrincipal,
-  currentApy,
+  dailyCppPerUsdt,
   onClose,
   onSuccess,
 }: {
   lang: Lang
   currentPrincipal: number
-  currentApy: number
+  dailyCppPerUsdt: number   // CPP earned per 1 USDT per day (with current boost)
   onClose: () => void
   onSuccess: (amount: number, mode: DepositMode) => void
 }) {
@@ -224,6 +224,7 @@ function DepositSheet({
   const [amount, setAmount] = useState('')
   const [done, setDone] = useState(false)
   const num = parseFloat(amount) || 0
+  const estDailyCpp = Math.round(num * dailyCppPerUsdt)
 
   const handleConfirm = () => {
     onSuccess(num, mode)
@@ -288,12 +289,8 @@ function DepositSheet({
           {mode === 'deposit' ? (
             <>
               <div className="list-item">
-                <span>{t.youGet}</span>
-                <strong>{num.toLocaleString('en')} ceUSDT</strong>
-              </div>
-              <div className="list-item">
-                <span>{t.estApy}</span>
-                <strong className="green">{currentApy.toFixed(1)}%</strong>
+                <span>{t.estDailyCpp}</span>
+                <strong className="green">≈ {estDailyCpp.toLocaleString('en')} CPP</strong>
               </div>
               <div className="list-item">
                 <span>{t.flexible}</span>
@@ -325,12 +322,14 @@ function DepositSheet({
 // ── Lock Sheet ────────────────────────────────────────────────────────────────
 function LockSheet({
   lang,
-  currentVecpotBoost,
+  currentVecpotBoostPct,
+  nftBoostPct,
   onClose,
   onSuccess,
 }: {
   lang: Lang
-  currentVecpotBoost: number
+  currentVecpotBoostPct: number
+  nftBoostPct: number
   onClose: () => void
   onSuccess: (duration: LockDuration, amount: number) => void
 }) {
@@ -339,8 +338,11 @@ function LockSheet({
   const [duration, setDuration] = useState<LockDuration>(90)
   const [amount, setAmount] = useState('')
   const num = parseFloat(amount) || 0
-  const boost = DURATION_BOOST[duration]
-  const newTotalApy = BASE_APY + currentVecpotBoost + boost
+  const addedBoost = DURATION_BOOST[duration]
+  // Take highest of current vs new (in case this duration is lower than existing)
+  const effectiveVecpotBoost = Math.max(currentVecpotBoostPct, addedBoost)
+  const totalBoostPct = effectiveVecpotBoost + nftBoostPct
+  const multiplier = ((100 + totalBoostPct) / 100).toFixed(3)
 
   const handleConfirm = () => {
     onSuccess(duration, num)
@@ -353,7 +355,7 @@ function LockSheet({
         <div className="success-icon">✓</div>
         <h2>{t.lockSuccess}</h2>
         <p className="success-body">{t.lockSuccessBody(num, duration)}</p>
-        <p className="success-apy">{t.lockSuccessApy(newTotalApy)}</p>
+        <p className="success-apy">{t.lockSuccessBoost(`×${multiplier}`)}</p>
         <button className="primary-button full-width" onClick={onClose}>
           {t.done}
         </button>
@@ -376,11 +378,11 @@ function LockSheet({
           </div>
           <div className="list-item">
             <span>{t.addedBoost}</span>
-            <strong className="green">+{boost.toFixed(1)}%</strong>
+            <strong className="green">+{addedBoost.toFixed(1)}%</strong>
           </div>
           <div className="list-item">
-            <span>{t.newApy}</span>
-            <strong className="green">{newTotalApy.toFixed(1)}%</strong>
+            <span>{t.newMultiplier}</span>
+            <strong className="green">×{multiplier}</strong>
           </div>
         </div>
         <p className="note-text">{t.lockWarning}</p>
@@ -429,22 +431,28 @@ function LockSheet({
 
       <div className="apy-calc">
         <div className="calc-row">
-          <span>{t.baseApyLabel}</span>
-          <span>{BASE_APY.toFixed(1)}%</span>
+          <span>{t.baseWeightLabel}</span>
+          <span>×1.000</span>
         </div>
-        {currentVecpotBoost > 0 && (
+        {currentVecpotBoostPct > 0 && (
           <div className="calc-row">
             <span>{t.alreadyBoost}</span>
-            <span className="green">+{currentVecpotBoost.toFixed(1)}%</span>
+            <span className="green">+{currentVecpotBoostPct.toFixed(1)}%</span>
           </div>
         )}
         <div className="calc-row green-row">
           <span>{t.addedBoost}</span>
-          <span className="green">+{boost.toFixed(1)}%</span>
+          <span className="green">+{addedBoost.toFixed(1)}%</span>
         </div>
+        {nftBoostPct > 0 && (
+          <div className="calc-row">
+            <span>{t.nftBoostLabel}</span>
+            <span className="green">+{nftBoostPct.toFixed(1)}%</span>
+          </div>
+        )}
         <div className="calc-row total-row">
-          <strong>{t.newApy}</strong>
-          <strong className="green">{newTotalApy.toFixed(1)}%</strong>
+          <strong>{t.newMultiplier}</strong>
+          <strong className="green">×{multiplier}</strong>
         </div>
       </div>
 
@@ -467,6 +475,7 @@ function NftSheet({ lang, onClose }: { lang: Lang; onClose: () => void }) {
       <div className="nft-icon">🖼</div>
       <h2>{t.nftSheetTitle}</h2>
       <p className="sheet-desc">{t.nftSheetBody}</p>
+      <p className="note-text">{t.nftStakedNote}</p>
       <button className="primary-button full-width">{t.goMarketplace}</button>
       <button className="secondary-button full-width" onClick={onClose}>
         {t.close}
@@ -493,9 +502,8 @@ export default function App() {
 
   // Simulated wallet state
   const [principal, setPrincipal] = useState(3200)
-  const earned = 86.4
 
-  // Multiple lock positions — each has its own duration and expiry
+  // Multiple lock positions
   const [locks, setLocks] = useState<LockPos[]>([
     { id: 1, amount: 5000, durationDays: 180, unlockZh: '6月1日', unlockEn: 'Jun 1', expired: false },
     { id: 2, amount: 2000, durationDays: 30,  unlockZh: '3月20日', unlockEn: 'Mar 20', expired: true },
@@ -504,18 +512,25 @@ export default function App() {
   const maxDuration = activeLocks.length > 0
     ? (Math.max(...activeLocks.map((l) => l.durationDays)) as LockDuration)
     : 0
-  const vecpotBoost = maxDuration > 0 ? DURATION_BOOST[maxDuration] : 0
+  const vecpotBoostPct = maxDuration > 0 ? DURATION_BOOST[maxDuration] : 0
 
   const nftCount = 0
-  const nftBoost = nftCount > 0 ? 1.5 : 0
-  const currentApy = BASE_APY + vecpotBoost + nftBoost
-  const totalAssets = principal + earned
+  const nftBoostPct = nftCount > 0 ? NFT_BOOST_BPS / 100 : 0
+
+  // Total boost multiplier
+  const totalBoostPct = vecpotBoostPct + nftBoostPct
+  const multiplier = (100 + totalBoostPct) / 100  // e.g. 1.035
+  const multiplierStr = `×${multiplier.toFixed(3)}`
+
+  // Daily CPP estimate
+  const dailyCppPerUsdt = BASE_CPP_PER_USDT_DAY * multiplier
+  const estimatedDailyCPP = Math.round(principal * dailyCppPerUsdt)
 
   // CPP claim state
   const [pendingCPP, setPendingCPP] = useState(286)
   const [cppClaiming, setCppClaiming] = useState(false)
 
-  // Dynamic history (zh and en kept in sync via lang switch)
+  // Dynamic history
   const [historyZh, setHistoryZh] = useState<HistoryItem[]>(T.zh.initialHistory)
   const [historyEn, setHistoryEn] = useState<HistoryItem[]>(T.en.initialHistory)
   const history = lang === 'zh' ? historyZh : historyEn
@@ -532,12 +547,12 @@ export default function App() {
   const handleDepositSuccess = (amount: number, mode: DepositMode) => {
     if (mode === 'deposit') {
       setPrincipal((p) => p + amount)
-      const entry: HistoryItem = { icon: '↓', text: lang === 'zh' ? '存入 USDT' : 'Deposited USDT', amount: `+$${amount.toLocaleString('en')}`, time: now() }
+      const entry: HistoryItem = { icon: '↓', text: '', amount: `+$${amount.toLocaleString('en')}`, time: now() }
       setHistoryZh((h) => [{ ...entry, text: '存入 USDT' }, ...h])
       setHistoryEn((h) => [{ ...entry, text: 'Deposited USDT' }, ...h])
     } else {
       setPrincipal((p) => Math.max(0, p - amount))
-      const entry: HistoryItem = { icon: '↑', text: lang === 'zh' ? '取出 USDT' : 'Withdrew USDT', amount: `-$${amount.toLocaleString('en')}`, time: now() }
+      const entry: HistoryItem = { icon: '↑', text: '', amount: `-$${amount.toLocaleString('en')}`, time: now() }
       setHistoryZh((h) => [{ ...entry, text: '取出 USDT' }, ...h])
       setHistoryEn((h) => [{ ...entry, text: 'Withdrew USDT' }, ...h])
     }
@@ -593,12 +608,13 @@ export default function App() {
         <div className="screen-body">
           {/* ── Hero ── */}
           <section className="earn-hero">
-            <div className="hero-label">{t.totalLabel}</div>
+            <div className="hero-label">{t.depositLabel}</div>
             <div className="hero-amount">
-              ${totalAssets.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${principal.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="hero-apy">
-              {t.apyLabel} <span className="apy-num">{currentApy.toFixed(1)}%</span>
+              {t.dailyCppLabel}{' '}
+              <span className="apy-num">≈ {estimatedDailyCPP.toLocaleString('en')} CPP</span>
             </div>
             <div className="button-row">
               <button className="primary-button" onClick={() => setSheet('deposit')}>
@@ -610,20 +626,10 @@ export default function App() {
             </div>
           </section>
 
-          {/* ── Position ── */}
+          {/* ── Rewards ── */}
           <section className="content-card">
             <h2>{t.positionTitle}</h2>
             <div className="list-group">
-              <div className="list-item">
-                <span>{t.principalLabel}</span>
-                <strong>
-                  ${principal.toLocaleString('en', { minimumFractionDigits: 2 })}
-                </strong>
-              </div>
-              <div className="list-item">
-                <span>{t.liquidityLabel}</span>
-                <strong>{t.liquidityVal}</strong>
-              </div>
               <div className="list-item cpp-claim-row">
                 <div className="cpp-claim-left">
                   <span>{t.pendingCppLabel}</span>
@@ -639,6 +645,14 @@ export default function App() {
                   {cppClaiming ? '···' : t.claimCppBtn}
                 </button>
               </div>
+              <div className="list-item">
+                <span>{t.liquidityLabel}</span>
+                <strong>{t.liquidityVal}</strong>
+              </div>
+              <div className="list-item">
+                <span>{t.cppRefLabel}</span>
+                <span className="muted-val">{t.cppRefVal}</span>
+              </div>
             </div>
           </section>
 
@@ -646,10 +660,10 @@ export default function App() {
           <section className="content-card">
             <div className="section-header">
               <h2>{t.boostTitle}</h2>
-              <span className="apy-badge">{currentApy.toFixed(1)}%</span>
+              <span className="apy-badge">{multiplierStr}</span>
             </div>
 
-            {/* veCPOT header row */}
+            {/* veCPOT row */}
             <div className="boost-row-card">
               <div className="boost-left">
                 <div className="boost-title">{t.lockCpotTitle}</div>
@@ -658,8 +672,8 @@ export default function App() {
                 </div>
               </div>
               <div className="boost-right">
-                <span className={`boost-badge ${vecpotBoost > 0 ? 'on' : 'off'}`}>
-                  {vecpotBoost > 0 ? `+${vecpotBoost.toFixed(1)}%` : '+0%'}
+                <span className={`boost-badge ${vecpotBoostPct > 0 ? 'on' : 'off'}`}>
+                  {vecpotBoostPct > 0 ? `+${vecpotBoostPct.toFixed(1)}%` : '+0%'}
                 </span>
                 <button className="mini-btn" onClick={() => setSheet('lock')}>
                   {activeLocks.length > 0 ? t.moreLockBtn : t.lockNowBtn}
@@ -694,17 +708,17 @@ export default function App() {
 
             <div className="boost-divider" />
 
-            {/* NFT */}
+            {/* NFT row */}
             <div className="boost-row-card">
               <div className="boost-left">
                 <div className="boost-title">{t.nftTitle}</div>
                 <div className="boost-sub">
-                  {nftCount > 0 ? t.nftActiveSub(nftCount) : t.nftNoneSub}
+                  {nftCount > 0 ? t.nftActiveSub : t.nftNoneSub}
                 </div>
               </div>
               <div className="boost-right">
-                <span className={`boost-badge ${nftBoost > 0 ? 'on' : 'off'}`}>
-                  {nftBoost > 0 ? `+${nftBoost.toFixed(1)}%` : '+0%'}
+                <span className={`boost-badge ${nftBoostPct > 0 ? 'on' : 'off'}`}>
+                  {nftBoostPct > 0 ? `+${nftBoostPct.toFixed(1)}%` : '+0%'}
                 </span>
                 <button
                   className="mini-btn secondary"
@@ -715,27 +729,27 @@ export default function App() {
               </div>
             </div>
 
-            {/* APY breakdown */}
+            {/* Multiplier breakdown */}
             <div className="apy-calc">
               <div className="calc-row">
-                <span>{t.baseApyLabel}</span>
-                <span>{BASE_APY.toFixed(1)}%</span>
+                <span>{t.baseWeightLabel}</span>
+                <span>×1.000</span>
               </div>
-              {vecpotBoost > 0 && (
+              {vecpotBoostPct > 0 && (
                 <div className="calc-row">
                   <span>{t.vecpotBoostLabel}</span>
-                  <span className="green">+{vecpotBoost.toFixed(1)}%</span>
+                  <span className="green">+{vecpotBoostPct.toFixed(1)}%</span>
                 </div>
               )}
-              {nftBoost > 0 && (
+              {nftBoostPct > 0 && (
                 <div className="calc-row">
                   <span>{t.nftBoostLabel}</span>
-                  <span className="green">+{nftBoost.toFixed(1)}%</span>
+                  <span className="green">+{nftBoostPct.toFixed(1)}%</span>
                 </div>
               )}
               <div className="calc-row total-row">
-                <strong>{t.currentApyLabel}</strong>
-                <strong className="green">{currentApy.toFixed(1)}%</strong>
+                <strong>{t.multiplierLabel}</strong>
+                <strong className="green">{multiplierStr}</strong>
               </div>
             </div>
           </section>
@@ -766,7 +780,7 @@ export default function App() {
         <DepositSheet
           lang={lang}
           currentPrincipal={principal}
-          currentApy={currentApy}
+          dailyCppPerUsdt={dailyCppPerUsdt}
           onClose={closeSheet}
           onSuccess={handleDepositSuccess}
         />
@@ -775,7 +789,8 @@ export default function App() {
       <BottomSheet open={sheet === 'lock'} onClose={closeSheet}>
         <LockSheet
           lang={lang}
-          currentVecpotBoost={vecpotBoost}
+          currentVecpotBoostPct={vecpotBoostPct}
+          nftBoostPct={nftBoostPct}
           onClose={closeSheet}
           onSuccess={(d, n) => handleLockSuccess(d, n)}
         />
