@@ -4,8 +4,14 @@ import './App.css'
 // ── Constants ─────────────────────────────────────────────────────────────────
 // Simulated: base CPP earned per 1 USDT per day (at no boost)
 const BASE_CPP_PER_USDT_DAY = 0.1   // e.g. 100 USDT → 10 CPP/day
-const DURATION_BOOST: Record<number, number> = { 30: 1.0, 90: 2.0, 180: 3.5, 360: 5.0 }
-const NFT_BOOST_BPS = 150           // +1.5% for demo NFT
+const NFT_BOOST_BPS = 50            // S级演示 +0.5%
+
+// veCPOT boost formula: boostBps = min((veUnits × BOOST_PER_VE_UNIT) / BOOST_VE_PRECISION, MAX_VECPOT_BOOST_BPS)
+// veUnits = cpotAmount × durationDays / 360
+const BOOST_PER_VE_UNIT = 1         // boost numerator
+const BOOST_VE_PRECISION = 10       // divisor — 10 veCPOT units = 1 bps
+const MAX_VECPOT_BOOST_BPS = 500    // +5% cap
+
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Sheet = null | 'deposit' | 'lock' | 'nft' | 'rules'
@@ -77,7 +83,7 @@ const T = {
     done: '完成',
     // lock sheet
     lockTitle: '锁 CPOT 提升 CPP 收益',
-    lockDesc: '锁仓时间越长，收益加速倍率越高。到期自动解锁，CPOT 原路退回。',
+    lockDesc: '锁仓越多越久，veCPOT 越高，CPP 收益加速越大。到期自动解锁，CPOT 原路退回。',
     allCpot: '全部 12,000',
     addedBoost: '本次加速',
     newMultiplier: '锁仓后倍率',
@@ -106,17 +112,26 @@ const T = {
     rulesS2Title: '二、收益计算公式',
     rulesS2Body: '你的每秒 CPP = 全网排放速率 × 你的加权 USDT ÷ 全网加权 USDT 合计\n\n加权 USDT = 存款 × (1 + CPOT加速 + NFT加速)',
     rulesS3Title: '三、加速倍率',
-    rulesS3Rows: [
-      { label: '无加速', value: '×1.000' },
-      { label: 'CPOT 锁仓 30天', value: '+1%' },
-      { label: 'CPOT 锁仓 90天', value: '+2%' },
-      { label: 'CPOT 锁仓 180天', value: '+3.5%' },
-      { label: 'CPOT 锁仓 360天', value: '+5%' },
-      { label: 'NFT B级', value: '+0.5%' },
-      { label: 'NFT A级', value: '+1%' },
-      { label: 'NFT S级', value: '+2%' },
-      { label: 'NFT SS级', value: '+3.5%' },
+    rulesS3CpotTitle: '🔒 CPOT 锁仓加速（多仓位 veCPOT 可叠加，上限 +5%）',
+    rulesS3CpotDesc: 'veCPOT 单位 = 锁仓 CPOT × 天数 ÷ 360   加速 = veCPOT单位 ÷ 10',
+    rulesS3CpotRows: [
+      { label: '1,000 CPOT × 30天', ve: '83', value: '+0.08%' },
+      { label: '1,000 CPOT × 90天', ve: '250', value: '+0.25%' },
+      { label: '5,000 CPOT × 90天', ve: '1,250', value: '+1.25%' },
+      { label: '10,000 CPOT × 90天', ve: '2,500', value: '+2.50%' },
+      { label: '20,000 CPOT × 90天', ve: '5,000', value: '+5.0% ✦上限' },
+      { label: '10,000 CPOT × 180天', ve: '5,000', value: '+5.0% ✦上限' },
+      { label: '5,000 CPOT × 360天', ve: '5,000', value: '+5.0% ✦上限' },
     ],
+    rulesS3NftTitle: '🎖 NFT 等级加速（注册未质押 NFT，取最高等级）',
+    rulesS3NftRows: [
+      { label: '无 / NORMAL / C 级', value: '+0%' },
+      { label: 'B 级', value: '+0.1%' },
+      { label: 'A 级', value: '+0.2%' },
+      { label: 'S 级', value: '+0.5%' },
+      { label: 'SS 级', value: '+3.5%' },
+    ],
+    rulesS3Note: '两项加速可同时叠加，总倍率 = 1 + CPOT加速 + NFT加速',
     rulesS4Title: '四、CPP 用途',
     rulesS4Body: '领取的 CPP 发放至你的 AA 账户，可在 App 内消费或充值 U 卡在线下场景使用。参考换算：1 CPP = 0.002 USDT。',
     rulesS5Title: '五、注意事项',
@@ -187,7 +202,7 @@ const T = {
     withdrawSuccessBody: 'Withdrawal submitted. Usually arrives T+0.',
     done: 'Done',
     lockTitle: 'Lock CPOT to boost CPP rewards',
-    lockDesc: 'Longer lock = higher multiplier. Auto-unlocked at expiry, CPOT returned.',
+    lockDesc: 'More CPOT × longer lock = more veCPOT = higher CPP boost. Auto-unlocked at expiry, CPOT returned.',
     allCpot: 'Max 12,000',
     addedBoost: 'Boost added',
     newMultiplier: 'Multiplier after lock',
@@ -215,17 +230,26 @@ const T = {
     rulesS2Title: '2. Reward formula',
     rulesS2Body: 'Your CPP/sec = global emission rate × your weighted USDT ÷ total weighted USDT\n\nWeighted USDT = deposit × (1 + CPOT boost + NFT boost)',
     rulesS3Title: '3. Boost tiers',
-    rulesS3Rows: [
-      { label: 'No boost', value: '×1.000' },
-      { label: 'Lock CPOT 30d', value: '+1%' },
-      { label: 'Lock CPOT 90d', value: '+2%' },
-      { label: 'Lock CPOT 180d', value: '+3.5%' },
-      { label: 'Lock CPOT 360d', value: '+5%' },
-      { label: 'NFT Level B', value: '+0.5%' },
-      { label: 'NFT Level A', value: '+1%' },
-      { label: 'NFT Level S', value: '+2%' },
-      { label: 'NFT Level SS', value: '+3.5%' },
+    rulesS3CpotTitle: '🔒 CPOT Lock Boost (stacks across positions, capped at +5%)',
+    rulesS3CpotDesc: 'veCPOT = locked CPOT × days ÷ 360   boost = veCPOT ÷ 10',
+    rulesS3CpotRows: [
+      { label: '1,000 CPOT × 30d', ve: '83', value: '+0.08%' },
+      { label: '1,000 CPOT × 90d', ve: '250', value: '+0.25%' },
+      { label: '5,000 CPOT × 90d', ve: '1,250', value: '+1.25%' },
+      { label: '10,000 CPOT × 90d', ve: '2,500', value: '+2.50%' },
+      { label: '20,000 CPOT × 90d', ve: '5,000', value: '+5.0% ✦cap' },
+      { label: '10,000 CPOT × 180d', ve: '5,000', value: '+5.0% ✦cap' },
+      { label: '5,000 CPOT × 360d', ve: '5,000', value: '+5.0% ✦cap' },
     ],
+    rulesS3NftTitle: '🎖 NFT Level Boost (register one un-staked NFT)',
+    rulesS3NftRows: [
+      { label: 'None / NORMAL / C', value: '+0%' },
+      { label: 'Level B', value: '+0.1%' },
+      { label: 'Level A', value: '+0.2%' },
+      { label: 'Level S', value: '+0.5%' },
+      { label: 'Level SS', value: '+3.5%' },
+    ],
+    rulesS3Note: 'Both boosts stack: total multiplier = 1 + CPOT boost + NFT boost',
     rulesS4Title: '4. CPP utility',
     rulesS4Body: 'Claimed CPP is minted to your AA account. Use it in-app or top up a U-Card for offline spending. Reference rate: 1 CPP = $0.002.',
     rulesS5Title: '5. Important notes',
@@ -376,13 +400,13 @@ function DepositSheet({
 // ── Lock Sheet ────────────────────────────────────────────────────────────────
 function LockSheet({
   lang,
-  currentVecpotBoostPct,
+  currentTotalVeUnits,
   nftBoostPct,
   onClose,
   onSuccess,
 }: {
   lang: Lang
-  currentVecpotBoostPct: number
+  currentTotalVeUnits: number
   nftBoostPct: number
   onClose: () => void
   onSuccess: (duration: LockDuration, amount: number) => void
@@ -392,11 +416,20 @@ function LockSheet({
   const [duration, setDuration] = useState<LockDuration>(90)
   const [amount, setAmount] = useState('')
   const num = parseFloat(amount) || 0
-  const addedBoost = DURATION_BOOST[duration]
-  // Take highest of current vs new (in case this duration is lower than existing)
-  const effectiveVecpotBoost = Math.max(currentVecpotBoostPct, addedBoost)
-  const totalBoostPct = effectiveVecpotBoost + nftBoostPct
+
+  // New veCPOT units this lock would add
+  const newVeUnits = Math.floor((num * duration) / 360)
+  // Combined veCPOT boost after this lock
+  const combinedVeUnits = currentTotalVeUnits + newVeUnits
+  const afterVecpotBoostBps = Math.min(Math.floor((combinedVeUnits * BOOST_PER_VE_UNIT) / BOOST_VE_PRECISION), MAX_VECPOT_BOOST_BPS)
+  const afterVecpotBoostPct = afterVecpotBoostBps / 100
+  const totalBoostPct = afterVecpotBoostPct + nftBoostPct
   const multiplier = ((100 + totalBoostPct) / 100).toFixed(3)
+
+  // Current boost before this lock
+  const currentBoostBps = Math.min(Math.floor((currentTotalVeUnits * BOOST_PER_VE_UNIT) / BOOST_VE_PRECISION), MAX_VECPOT_BOOST_BPS)
+  const currentVecpotBoostPct = currentBoostBps / 100
+  const addedVecpotBoostPct = afterVecpotBoostPct - currentVecpotBoostPct
 
   const handleConfirm = () => {
     onSuccess(duration, num)
@@ -431,8 +464,12 @@ function LockSheet({
             <strong>{t.durationLabels[duration]}</strong>
           </div>
           <div className="list-item">
+            <span>{lang === 'zh' ? '新增 veCPOT' : 'Added veCPOT'}</span>
+            <strong>+{newVeUnits.toLocaleString('en')} 单位</strong>
+          </div>
+          <div className="list-item">
             <span>{t.addedBoost}</span>
-            <strong className="green">+{addedBoost.toFixed(1)}%</strong>
+            <strong className="green">+{addedVecpotBoostPct.toFixed(2)}%</strong>
           </div>
           <div className="list-item">
             <span>{t.newMultiplier}</span>
@@ -456,16 +493,24 @@ function LockSheet({
       <p className="sheet-desc">{t.lockDesc}</p>
 
       <div className="duration-grid">
-        {([30, 90, 180, 360] as LockDuration[]).map((d) => (
-          <button
-            key={d}
-            className={`duration-btn ${duration === d ? 'active' : ''}`}
-            onClick={() => setDuration(d)}
-          >
-            <span className="d-label">{t.durationLabels[d]}</span>
-            <span className="d-boost">+{DURATION_BOOST[d].toFixed(1)}%</span>
-          </button>
-        ))}
+        {([30, 90, 180, 360] as LockDuration[]).map((d) => {
+          const veCoeff = (d / 360).toFixed(2)
+          const previewVe = num > 0 ? Math.floor((num * d) / 360) : null
+          return (
+            <button
+              key={d}
+              className={`duration-btn ${duration === d ? 'active' : ''}`}
+              onClick={() => setDuration(d)}
+            >
+              <span className="d-label">{t.durationLabels[d]}</span>
+              <span className="d-boost">
+                {previewVe !== null
+                  ? `veCPOT +${previewVe.toLocaleString('en')}`
+                  : `系数 ×${veCoeff}`}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
       <div className="amount-field">
@@ -491,12 +536,16 @@ function LockSheet({
         {currentVecpotBoostPct > 0 && (
           <div className="calc-row">
             <span>{t.alreadyBoost}</span>
-            <span className="green">+{currentVecpotBoostPct.toFixed(1)}%</span>
+            <span className="green">+{currentVecpotBoostPct.toFixed(2)}%</span>
           </div>
         )}
         <div className="calc-row green-row">
-          <span>{t.addedBoost}</span>
-          <span className="green">+{addedBoost.toFixed(1)}%</span>
+          <span>
+            {lang === 'zh'
+              ? `本次锁仓 veCPOT +${newVeUnits.toLocaleString('en')}`
+              : `This lock veCPOT +${newVeUnits.toLocaleString('en')}`}
+          </span>
+          <span className="green">+{addedVecpotBoostPct.toFixed(2)}%</span>
         </div>
         {nftBoostPct > 0 && (
           <div className="calc-row">
@@ -561,14 +610,37 @@ function RulesSheet({ lang, onClose }: { lang: Lang; onClose: () => void }) {
 
       <div className="rules-section">
         <div className="rules-section-title">{t.rulesS3Title}</div>
+
+        {/* CPOT boost sub-table */}
+        <p className="rules-sub-label">{t.rulesS3CpotTitle}</p>
+        <p className="rules-body rules-formula-sub">{t.rulesS3CpotDesc}</p>
+        <div className="rules-table rules-table-3col">
+          <div className="rules-table-row rules-table-header">
+            <span>{lang === 'zh' ? '锁仓方案' : 'Lock plan'}</span>
+            <span className="center">{lang === 'zh' ? 'veCPOT' : 'veCPOT'}</span>
+            <span className="right green">{lang === 'zh' ? '加速' : 'Boost'}</span>
+          </div>
+          {t.rulesS3CpotRows.map((row, i) => (
+            <div className="rules-table-row" key={i}>
+              <span>{row.label}</span>
+              <span className="center muted-val">{row.ve}</span>
+              <span className={`right ${row.value.includes('✦') ? 'gold' : 'green'}`}>{row.value}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* NFT boost sub-table */}
+        <p className="rules-sub-label" style={{ marginTop: '12px' }}>{t.rulesS3NftTitle}</p>
         <div className="rules-table">
-          {t.rulesS3Rows.map((row, i) => (
+          {t.rulesS3NftRows.map((row, i) => (
             <div className="rules-table-row" key={i}>
               <span>{row.label}</span>
               <span className="green">{row.value}</span>
             </div>
           ))}
         </div>
+
+        <p className="rules-note">{t.rulesS3Note}</p>
       </div>
 
       <div className="rules-section">
@@ -617,10 +689,10 @@ export default function App() {
     { id: 2, amount: 2000, durationDays: 30,  unlockZh: '3月20日', unlockEn: 'Mar 20', expired: true },
   ])
   const activeLocks = locks.filter((l) => !l.expired)
-  const maxDuration = activeLocks.length > 0
-    ? (Math.max(...activeLocks.map((l) => l.durationDays)) as LockDuration)
-    : 0
-  const vecpotBoostPct = maxDuration > 0 ? DURATION_BOOST[maxDuration] : 0
+  // veCPOT = Σ (amount × durationDays / 360) across active locks
+  const totalVeUnits = activeLocks.reduce((sum, l) => sum + (l.amount * l.durationDays) / 360, 0)
+  const vecpotBoostBps = Math.min(Math.floor((totalVeUnits * BOOST_PER_VE_UNIT) / BOOST_VE_PRECISION), MAX_VECPOT_BOOST_BPS)
+  const vecpotBoostPct = vecpotBoostBps / 100
 
   const nftCount = 0
   const nftBoostPct = nftCount > 0 ? NFT_BOOST_BPS / 100 : 0
@@ -786,7 +858,9 @@ export default function App() {
               </div>
               <div className="boost-right">
                 <span className={`boost-badge ${vecpotBoostPct > 0 ? 'on' : 'off'}`}>
-                  {vecpotBoostPct > 0 ? `+${vecpotBoostPct.toFixed(1)}%` : '+0%'}
+                  {vecpotBoostPct > 0
+                    ? `+${vecpotBoostPct.toFixed(2)}% (${Math.floor(totalVeUnits)} veCPOT)`
+                    : '+0%'}
                 </span>
                 <button className="mini-btn" onClick={() => setSheet('lock')}>
                   {activeLocks.length > 0 ? t.moreLockBtn : t.lockNowBtn}
@@ -850,8 +924,8 @@ export default function App() {
               </div>
               {vecpotBoostPct > 0 && (
                 <div className="calc-row">
-                  <span>{t.vecpotBoostLabel}</span>
-                  <span className="green">+{vecpotBoostPct.toFixed(1)}%</span>
+                  <span>{t.vecpotBoostLabel} ({Math.floor(totalVeUnits)} veCPOT)</span>
+                  <span className="green">+{vecpotBoostPct.toFixed(2)}%</span>
                 </div>
               )}
               {nftBoostPct > 0 && (
@@ -902,7 +976,7 @@ export default function App() {
       <BottomSheet open={sheet === 'lock'} onClose={closeSheet}>
         <LockSheet
           lang={lang}
-          currentVecpotBoostPct={vecpotBoostPct}
+          currentTotalVeUnits={totalVeUnits}
           nftBoostPct={nftBoostPct}
           onClose={closeSheet}
           onSuccess={(d, n) => handleLockSuccess(d, n)}
