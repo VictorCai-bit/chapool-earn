@@ -726,3 +726,120 @@
 .sheet-content h2 {
   margin: 0 0 14px;
 }
+
+/* ── Header right group ─────────────────────────────────────────────────────── */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1.5px solid #5dde99;
+  background: transparent;
+  color: #5dde99;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  font-style: italic;
+}
+
+.info-btn:hover,
+.info-btn:active {
+  background: rgba(93, 222, 153, 0.12);
+}
+
+/* ── Rules Sheet ─────────────────────────────────────────────────────────────── */
+.rules-sheet {
+  padding-bottom: 8px;
+}
+
+.rules-sheet h2 {
+  margin-bottom: 18px;
+}
+
+.rules-section {
+  margin-bottom: 20px;
+}
+
+.rules-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #5dde99;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.rules-body {
+  font-size: 14px;
+  color: var(--text-soft);
+  line-height: 1.65;
+  margin: 0;
+}
+
+.rules-formula {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--text-soft);
+  line-height: 1.7;
+}
+
+.rules-formula p {
+  margin: 0;
+}
+
+.rules-formula-sub {
+  color: var(--text-soft);
+  opacity: 0.75;
+  font-size: 12.5px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  margin-top: 6px !important;
+}
+
+.rules-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rules-table-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13.5px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+.rules-table-row span:first-child {
+  color: var(--text-soft);
+}
+
+.rules-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rules-list li {
+  font-size: 13.5px;
+  color: var(--text-soft);
+  line-height: 1.55;
+}

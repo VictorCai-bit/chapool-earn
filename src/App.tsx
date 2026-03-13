@@ -8,7 +8,7 @@ const DURATION_BOOST: Record<number, number> = { 30: 1.0, 90: 2.0, 180: 3.5, 360
 const NFT_BOOST_BPS = 150           // +1.5% for demo NFT
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Sheet = null | 'deposit' | 'lock' | 'nft'
+type Sheet = null | 'deposit' | 'lock' | 'nft' | 'rules'
 type DepositMode = 'deposit' | 'withdraw'
 type LockDuration = 30 | 90 | 180 | 360
 type Lang = 'zh' | 'en'
@@ -99,6 +99,33 @@ const T = {
     nftStakedNote: '注意：正在质押的 NFT 无法激活 Earn 加速（避免双重收益）。',
     goMarketplace: '去 Marketplace',
     close: '关闭',
+    // rules sheet
+    rulesTitle: '收益规则说明',
+    rulesS1Title: '一、基本机制',
+    rulesS1Body: '存入 USDT 即开始实时累积 CPP 奖励，按秒计算，不依赖任何锁仓。USDT 本金 1:1 随时取回，无手续费。',
+    rulesS2Title: '二、收益计算公式',
+    rulesS2Body: '你的每秒 CPP = 全网排放速率 × 你的加权 USDT ÷ 全网加权 USDT 合计\n\n加权 USDT = 存款 × (1 + CPOT加速 + NFT加速)',
+    rulesS3Title: '三、加速倍率',
+    rulesS3Rows: [
+      { label: '无加速', value: '×1.000' },
+      { label: 'CPOT 锁仓 30天', value: '+1%' },
+      { label: 'CPOT 锁仓 90天', value: '+2%' },
+      { label: 'CPOT 锁仓 180天', value: '+3.5%' },
+      { label: 'CPOT 锁仓 360天', value: '+5%' },
+      { label: 'NFT B级', value: '+0.5%' },
+      { label: 'NFT A级', value: '+1%' },
+      { label: 'NFT S级', value: '+2%' },
+      { label: 'NFT SS级', value: '+3.5%' },
+    ],
+    rulesS4Title: '四、CPP 用途',
+    rulesS4Body: '领取的 CPP 发放至你的 AA 账户，可在 App 内消费或充值 U 卡在线下场景使用。参考换算：1 CPP = 0.002 USDT。',
+    rulesS5Title: '五、注意事项',
+    rulesS5Items: [
+      '质押中的 NFT 不能激活 Earn 加速（避免双重获益）',
+      'CPOT 锁仓期间不可取出，到期自动解锁并退回钱包',
+      '收益由平台周期性注入，注入量与平台收入挂钩',
+      'CPP 数量取决于你的存款比例，存入越多、持续越久、加速越高，领取越多',
+    ],
   },
   en: {
     header: 'Earn',
@@ -181,6 +208,33 @@ const T = {
     nftStakedNote: 'Note: NFTs currently staked cannot be activated for Earn boost (no double-dipping).',
     goMarketplace: 'Open Marketplace',
     close: 'Close',
+    // rules sheet
+    rulesTitle: 'How Earn Works',
+    rulesS1Title: '1. How rewards work',
+    rulesS1Body: 'Deposit USDT to start accruing CPP in real-time, per second. Your USDT principal is returned 1:1 at any time, with no fees.',
+    rulesS2Title: '2. Reward formula',
+    rulesS2Body: 'Your CPP/sec = global emission rate × your weighted USDT ÷ total weighted USDT\n\nWeighted USDT = deposit × (1 + CPOT boost + NFT boost)',
+    rulesS3Title: '3. Boost tiers',
+    rulesS3Rows: [
+      { label: 'No boost', value: '×1.000' },
+      { label: 'Lock CPOT 30d', value: '+1%' },
+      { label: 'Lock CPOT 90d', value: '+2%' },
+      { label: 'Lock CPOT 180d', value: '+3.5%' },
+      { label: 'Lock CPOT 360d', value: '+5%' },
+      { label: 'NFT Level B', value: '+0.5%' },
+      { label: 'NFT Level A', value: '+1%' },
+      { label: 'NFT Level S', value: '+2%' },
+      { label: 'NFT Level SS', value: '+3.5%' },
+    ],
+    rulesS4Title: '4. CPP utility',
+    rulesS4Body: 'Claimed CPP is minted to your AA account. Use it in-app or top up a U-Card for offline spending. Reference rate: 1 CPP = $0.002.',
+    rulesS5Title: '5. Important notes',
+    rulesS5Items: [
+      'Staked NFTs cannot activate Earn boost (no double-dipping)',
+      'Locked CPOT cannot be withdrawn until expiry — auto-released at unlock date',
+      'Emission rate is set periodically based on platform revenue',
+      'More USDT deposited + longer duration + higher boost = more CPP earned',
+    ],
   },
 }
 
@@ -484,6 +538,60 @@ function NftSheet({ lang, onClose }: { lang: Lang; onClose: () => void }) {
   )
 }
 
+// ── Rules Sheet ───────────────────────────────────────────────────────────────
+function RulesSheet({ lang, onClose }: { lang: Lang; onClose: () => void }) {
+  const t = T[lang]
+  return (
+    <div className="sheet-content rules-sheet">
+      <h2>{t.rulesTitle}</h2>
+
+      <div className="rules-section">
+        <div className="rules-section-title">{t.rulesS1Title}</div>
+        <p className="rules-body">{t.rulesS1Body}</p>
+      </div>
+
+      <div className="rules-section">
+        <div className="rules-section-title">{t.rulesS2Title}</div>
+        <div className="rules-formula">
+          {t.rulesS2Body.split('\n\n').map((line, i) => (
+            <p key={i} className={i === 1 ? 'rules-formula-sub' : ''}>{line}</p>
+          ))}
+        </div>
+      </div>
+
+      <div className="rules-section">
+        <div className="rules-section-title">{t.rulesS3Title}</div>
+        <div className="rules-table">
+          {t.rulesS3Rows.map((row, i) => (
+            <div className="rules-table-row" key={i}>
+              <span>{row.label}</span>
+              <span className="green">{row.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rules-section">
+        <div className="rules-section-title">{t.rulesS4Title}</div>
+        <p className="rules-body">{t.rulesS4Body}</p>
+      </div>
+
+      <div className="rules-section">
+        <div className="rules-section-title">{t.rulesS5Title}</div>
+        <ul className="rules-list">
+          {t.rulesS5Items.map((item, i) => (
+            <li key={i}>{item}</li>
+          ))}
+        </ul>
+      </div>
+
+      <button className="secondary-button full-width" onClick={onClose}>
+        {t.close}
+      </button>
+    </div>
+  )
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 type HistoryItem = { icon: string; text: string; amount: string; time: string }
 type LockPos = {
@@ -599,9 +707,14 @@ export default function App() {
     <div className="mobile-shell">
       <header className="app-header">
         <strong className="brand">{t.header}</strong>
-        <button className="language-toggle" onClick={() => setLang((l) => (l === 'zh' ? 'en' : 'zh'))}>
-          {t.lang}
-        </button>
+        <div className="header-right">
+          <button className="info-btn" onClick={() => setSheet('rules')} aria-label="Earn rules">
+            !
+          </button>
+          <button className="language-toggle" onClick={() => setLang((l) => (l === 'zh' ? 'en' : 'zh'))}>
+            {t.lang}
+          </button>
+        </div>
       </header>
 
       <main className="app-main">
@@ -798,6 +911,10 @@ export default function App() {
 
       <BottomSheet open={sheet === 'nft'} onClose={closeSheet}>
         <NftSheet lang={lang} onClose={closeSheet} />
+      </BottomSheet>
+
+      <BottomSheet open={sheet === 'rules'} onClose={closeSheet}>
+        <RulesSheet lang={lang} onClose={closeSheet} />
       </BottomSheet>
     </div>
   )
