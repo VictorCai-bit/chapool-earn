@@ -787,6 +787,23 @@
   margin: 0;
 }
 
+.rules-summary {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.rules-summary-item {
+  margin-bottom: 14px;
+}
+.rules-summary-item:last-child {
+  margin-bottom: 0;
+}
+.rules-summary-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
 .rules-formula {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);

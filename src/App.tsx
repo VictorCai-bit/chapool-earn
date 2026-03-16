@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import './App.css'
+import { getEarnRewardRulesSections } from './copy/earnRewardRules'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 // Simulated: base CPP earned per 1 USDT per day (at no boost)
@@ -593,6 +594,16 @@ function RulesSheet({ lang, onClose }: { lang: Lang; onClose: () => void }) {
   return (
     <div className="sheet-content rules-sheet">
       <h2>{t.rulesTitle}</h2>
+
+      {/* 简明收益规则（来自 earnRewardRules.ts，中英文） */}
+      <div className="rules-section rules-summary">
+        {getEarnRewardRulesSections(lang).map((section, i) => (
+            <div key={i} className="rules-summary-item">
+              <div className="rules-summary-item-title">{section.title}</div>
+              <p className="rules-body">{section.body}</p>
+            </div>
+          ))}
+      </div>
 
       <div className="rules-section">
         <div className="rules-section-title">{t.rulesS1Title}</div>

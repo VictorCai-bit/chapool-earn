@@ -1,11 +1,15 @@
 /**
  * Earn 收益规则说明 — 供「如何计算收益」/ 帮助折叠区使用
  * 与 docs/Earn-Feature-Spec.md §9 收益规则说明 保持一致
+ * 中英文双语
  */
 
-export const EARN_REWARD_RULES_TITLE = '收益规则说明'
+export type RewardRulesSection = { title: string; body: string }
 
-export const EARN_REWARD_RULES_SECTIONS = [
+export const EARN_REWARD_RULES_TITLE_ZH = '收益规则说明'
+export const EARN_REWARD_RULES_TITLE_EN = 'How rewards work'
+
+export const EARN_REWARD_RULES_ZH: RewardRulesSection[] = [
   {
     title: '收益从哪来？',
     body: '平台将部分收入或手续费折算成 CPP，按周期注入 Earn 金库；您存入的 USDT 越多、占比越高，分到的 CPP 越多。',
@@ -22,4 +26,27 @@ export const EARN_REWARD_RULES_SECTIONS = [
     title: '一句话总结',
     body: '多存、多锁 CPOT 或激活 NFT 可提高您的分配比例；收益按秒累积，随时可领取，领到的 CPP 可充 UCard 用。',
   },
-] as const
+]
+
+export const EARN_REWARD_RULES_EN: RewardRulesSection[] = [
+  {
+    title: 'Where do rewards come from?',
+    body: 'Platform revenue or fees are converted into CPP and injected into the Earn vault on a schedule. The more USDT you deposit and the higher your share of the pool, the more CPP you earn.',
+  },
+  {
+    title: 'How is my share calculated?',
+    body: 'Your "weight" is based on your deposit: more deposit means a larger weight. If you lock CPOT or hold/activate an eligible NFT, you get an extra "boost" on top, so you earn a higher share of CPP. Every second, the vault allocates that second\'s CPP by (your weight ÷ total weight), so the longer you stay, the more you can claim.',
+  },
+  {
+    title: 'When do I get my rewards?',
+    body: 'Rewards keep accruing under "Pending CPP". You need to tap "Claim" to send them to your account. After claiming, you can use CPP in-app or top up your UCard for withdrawal or spending.',
+  },
+  {
+    title: 'In a nutshell',
+    body: 'Deposit more, lock CPOT, or activate an NFT to increase your share. Rewards accrue every second and can be claimed anytime; claimed CPP can be used to top up your UCard.',
+  },
+]
+
+export function getEarnRewardRulesSections(lang: 'zh' | 'en'): RewardRulesSection[] {
+  return lang === 'zh' ? EARN_REWARD_RULES_ZH : EARN_REWARD_RULES_EN
+}
