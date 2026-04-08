@@ -7,12 +7,19 @@ import {
   type Address,
   type Hash,
 } from 'viem'
-import { defineChain } from 'viem'
+import { defineChain, formatEther } from 'viem'
+import { fetchEarnChainSnapshot, formatRewardRateWei, type EarnChainSnapshot } from './earnDevReads'
 import {
   earnTestClockAbi,
   getEarnContractAddresses,
   OPBNB_TESTNET_CHAIN_ID,
 } from './earnTestContracts'
+import {
+  getSpecCopy,
+  NFT_BOOST_SPEC_ROWS,
+  SECONDS_WEEK,
+  SPEC_DOC,
+} from './earnSpecReference'
 
 const defaultOpbnbRpc = 'https://opbnb-testnet-rpc.bnbchain.org'
 const opbnbRpcUrl =
@@ -33,7 +40,16 @@ type Props = {
   onClose: () => void
 }
 
-type Preset = '1h' | '1d' | '7d' | 'custom' | null
+type Preset =
+  | '1h'
+  | '1d'
+  | '7d'
+  | 'custom'
+  | 'emergency'
+  | 'weekSample'
+  | null
+
+const EXPLORER_BASE = 'https://opbnb-testnet.bscscan.com/address/'
 
 function Spinner({ label }: { label?: string }) {
   return (
@@ -44,8 +60,52 @@ function Spinner({ label }: { label?: string }) {
   )
 }
 
+function AddressRow({
+  label,
+  addr,
+  spec,
+}: {
+  label: string
+  addr: Address
+  spec: ReturnType<typeof getSpecCopy>
+}) {
+  const [copied, setCopied] = useState(false)
+  const short = `${addr.slice(0, 6)}…${addr.slice(-4)}`
+  return (
+    <div className="test-time-addr-row">
+      <span className="test-time-addr-label">{label}</span>
+      <code className="test-time-addr-code" title={addr}>
+        {short}
+      </code>
+      <div className="test-time-addr-actions">
+        <a
+          className="test-time-link"
+          href={`${EXPLORER_BASE}${addr}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {spec.explorer}
+        </a>
+        <button
+          type="button"
+          className="test-time-link test-time-link--btn"
+          onClick={() => {
+            void navigator.clipboard.writeText(addr).then(() => {
+              setCopied(true)
+              window.setTimeout(() => setCopied(false), 1600)
+            })
+          }}
+        >
+          {copied ? spec.copied : spec.copyAddr}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function EarnTestTimePanel({ lang, onClose }: Props) {
   const copy = lang === 'zh' ? zh : en
+  const spec = getSpecCopy(lang)
   const addrs = getEarnContractAddresses()
 
   const [account, setAccount] = useState<Address | null>(null)
@@ -60,6 +120,9 @@ export function EarnTestTimePanel({ lang, onClose }: Props) {
   const [customSec, setCustomSec] = useState('3600')
   const [activePreset, setActivePreset] = useState<Preset>(null)
   const [statusLine, setStatusLine] = useState<string>('')
+  const [chainSnap, setChainSnap] = useState<EarnChainSnapshot | null>(null)
+  const [chainLoading, setChainLoading] = useState(false)
+  const [chainError, setChainError] = useState<string | null>(null)
 
   const publicClient = useMemo(
     () =>
@@ -98,6 +161,26 @@ export function EarnTestTimePanel({ lang, onClose }: Props) {
     },
     [addrs.distributor, addrs.locker, addrs.vault, publicClient]
   )
+
+  const loadChainSnapshot = useCallback(async () => {
+    setChainLoading(true)
+    setChainError(null)
+    try {
+      const snap = await fetchEarnChainSnapshot(publicClient, addrs.vault, addrs.locker)
+      if (!snap) {
+        setChainSnap(null)
+        setChainError(
+          lang === 'zh'
+            ? '无法读取 Vault/Locker（检查 RPC、合约地址与网络）'
+            : 'Could not read Vault/Locker (check RPC, addresses, network).'
+        )
+      } else {
+        setChainSnap(snap)
+      }
+    } finally {
+      setChainLoading(false)
+    }
+  }, [addrs.locker, addrs.vault, lang, publicClient])
 
   const connect = async () => {
     setLog('')
@@ -214,6 +297,8 @@ export function EarnTestTimePanel({ lang, onClose }: Props) {
 
   const fmtSec = (n: bigint) => n.toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')
 
+  const emergencyDelta = chainSnap?.vault.emergencyTimelock ?? 86400n
+
   return (
     <div className="sheet-content test-time-panel">
       <div className="sheet-header-row">
@@ -228,6 +313,163 @@ export function EarnTestTimePanel({ lang, onClose }: Props) {
         </button>
       </div>
       <p className="test-time-note">{copy.note}</p>
+
+      <details className="test-time-details">
+        <summary className="test-time-details-summary">{spec.sectionTitle}</summary>
+        <p className="test-time-spec-hint">
+          <code>{SPEC_DOC}</code> — {spec.docHint}
+        </p>
+
+        <div className="test-time-spec-block">
+          <div className="test-time-spec-label">{spec.formulasTitle}</div>
+          <pre className="test-time-spec-pre">
+            {spec.formulaLines.join('\n')}
+          </pre>
+        </div>
+        <ul className="test-time-spec-list">
+          <li>
+            <strong>{spec.cppRefTitle}</strong> — {spec.cppRefLine}
+          </li>
+          <li>
+            <strong>{spec.rateInjectTitle}</strong> — {spec.rateInjectLine}
+          </li>
+          <li>
+            <strong>{spec.lockTitle}</strong> — {spec.lockLine}
+          </li>
+          <li>
+            <strong>{spec.durationsTitle}</strong> — {spec.durations}
+          </li>
+          <li>
+            <strong>{spec.veTitle}</strong> — {spec.veLine}
+          </li>
+          <li>
+            <strong>{spec.boostTitle}</strong> — {spec.boostLine}
+          </li>
+          <li>
+            <strong>{spec.testClockTitle}</strong> — {spec.testClockLine}
+          </li>
+        </ul>
+
+        <div className="test-time-spec-block">
+          <div className="test-time-spec-label">{spec.nftTitle}</div>
+          <p className="test-time-spec-muted">{spec.nftNote}</p>
+          <table className="test-time-spec-table">
+            <thead>
+              <tr>
+                <th>NFT</th>
+                <th>bps</th>
+                <th>APY</th>
+              </tr>
+            </thead>
+            <tbody>
+              {NFT_BOOST_SPEC_ROWS.map((row) => (
+                <tr key={row.level}>
+                  <td>{row.level}</td>
+                  <td>{row.bps}</td>
+                  <td>+{row.pct}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="test-time-spec-block">
+          <div className="test-time-spec-label">{copy.addressesTitle}</div>
+          <AddressRow label="Vault" addr={addrs.vault} spec={spec} />
+          <AddressRow label="VeCPOTLocker" addr={addrs.locker} spec={spec} />
+          <AddressRow label="Distributor" addr={addrs.distributor} spec={spec} />
+        </div>
+
+        <div className="test-time-spec-block">
+          <div className="test-time-spec-label">{spec.chainReadsTitle}</div>
+          <p className="test-time-spec-muted">{spec.chainReadsHint}</p>
+          <button
+            type="button"
+            className="test-time-fetch-chain"
+            disabled={chainLoading}
+            onClick={() => void loadChainSnapshot()}
+          >
+            {chainLoading ? <Spinner label={copy.fetchingChain} /> : spec.fetchChainBtn}
+          </button>
+          {chainError ? <p className="test-time-chain-error">{chainError}</p> : null}
+          {chainSnap ? (
+            <div className="test-time-chain-grid">
+              <div className="test-time-chain-col">
+                <div className="test-time-chain-col-title">ChapoolEarnVault</div>
+                <div className="test-time-kv">
+                  <span>rewardRate</span>
+                  <strong>{formatRewardRateWei(chainSnap.vault.rewardRate)} CPP/s</strong>
+                </div>
+                <div className="test-time-kv">
+                  <span>totalWeightedUSDT</span>
+                  <strong title={chainSnap.vault.totalWeightedUSDT.toString()}>
+                    {formatEther(chainSnap.vault.totalWeightedUSDT)}
+                  </strong>
+                </div>
+                <div className="test-time-kv">
+                  <span>PRECISION</span>
+                  <strong>{chainSnap.vault.precision.toString()}</strong>
+                </div>
+                <div className="test-time-kv">
+                  <span>BPS_DENOMINATOR</span>
+                  <strong>{chainSnap.vault.bpsDenominator.toString()}</strong>
+                </div>
+                <div className="test-time-kv">
+                  <span>EMERGENCY_TIMELOCK</span>
+                  <strong>{fmtSec(chainSnap.vault.emergencyTimelock)} s</strong>
+                </div>
+                <div className="test-time-kv">
+                  <span>paused</span>
+                  <strong>{chainSnap.vault.paused ? spec.yes : spec.no}</strong>
+                </div>
+                <div className="test-time-kv">
+                  <span>emergencyMode</span>
+                  <strong>{chainSnap.vault.emergencyMode ? spec.yes : spec.no}</strong>
+                </div>
+              </div>
+              <div className="test-time-chain-col">
+                <div className="test-time-chain-col-title">VeCPOTLocker</div>
+                <div className="test-time-kv">
+                  <span>effectiveNow</span>
+                  <strong className="test-time-kv-wrap">
+                    {new Date(Number(chainSnap.locker.effectiveNow) * 1000).toLocaleString(
+                      lang === 'zh' ? 'zh-CN' : 'en-US',
+                      { dateStyle: 'short', timeStyle: 'medium' }
+                    )}
+                  </strong>
+                </div>
+                <div className="test-time-kv">
+                  <span>boostPerVeUnit</span>
+                  <strong>{chainSnap.locker.boostPerVeUnit.toString()}</strong>
+                </div>
+                <div className="test-time-kv">
+                  <span>maxVecpotBoostBps</span>
+                  <strong>{chainSnap.locker.maxVecpotBoostBps.toString()} bps</strong>
+                </div>
+                <div className="test-time-kv">
+                  <span>BOOST_VE_PRECISION</span>
+                  <strong>{chainSnap.locker.boostVePrecision.toString()}</strong>
+                </div>
+                <div className="test-time-kv">
+                  <span>MAX_LOCK_POSITIONS</span>
+                  <strong>{chainSnap.locker.maxLockPositions.toString()}</strong>
+                </div>
+                <div className="test-time-kv">
+                  <span>DURATION</span>
+                  <strong>
+                    {[
+                      chainSnap.locker.d30,
+                      chainSnap.locker.d90,
+                      chainSnap.locker.d180,
+                      chainSnap.locker.d360,
+                    ].join(' / ')}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </details>
 
       {!account ? (
         <button
@@ -295,6 +537,28 @@ export function EarnTestTimePanel({ lang, onClose }: Props) {
           onClick={() => void bumpAll(7n * DAY, '7d')}
         >
           +7d
+        </button>
+      </div>
+
+      <div className="test-time-quick-label">{spec.quickBumpTitle}</div>
+      <div className="test-time-actions test-time-actions--quick">
+        <button
+          type="button"
+          className={`test-time-bump-btn test-time-bump-btn--accent ${activePreset === 'emergency' ? 'is-pending' : ''}`}
+          disabled={busy || connecting || !account}
+          title={`${spec.bumpEmergency} (${fmtSec(emergencyDelta)}s)`}
+          onClick={() => void bumpAll(emergencyDelta, 'emergency')}
+        >
+          {spec.bumpEmergency}
+        </button>
+        <button
+          type="button"
+          className={`test-time-bump-btn test-time-bump-btn--accent ${activePreset === 'weekSample' ? 'is-pending' : ''}`}
+          disabled={busy || connecting || !account}
+          title={spec.bumpWeek}
+          onClick={() => void bumpAll(BigInt(SECONDS_WEEK), 'weekSample')}
+        >
+          {spec.bumpWeek}
         </button>
       </div>
 
@@ -371,6 +635,8 @@ const zh = {
   badSeconds: '请输入大于 0 的秒数',
   offsetsTitle: '当前虚拟时间偏移（秒）',
   secondsPh: '秒数',
+  addressesTitle: '合约地址（当前环境）',
+  fetchingChain: '读取中…',
 }
 
 const en = {
@@ -397,4 +663,6 @@ const en = {
   badSeconds: 'Enter seconds > 0',
   offsetsTitle: 'Virtual time offset (seconds)',
   secondsPh: 'seconds',
+  addressesTitle: 'Contract addresses (env)',
+  fetchingChain: 'Loading…',
 }
