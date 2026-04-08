@@ -18,7 +18,9 @@ function earnDevToolsVisible(): boolean {
   if (import.meta.env.DEV) return true
   if (import.meta.env.VITE_SHOW_EARN_TEST_TOOLS === 'true') return true
   if (typeof window !== 'undefined') {
-    return new URLSearchParams(window.location.search).has('earnDevTools')
+    const q = new URLSearchParams(window.location.search)
+    // earnDevTools — documented; earnDexTools — alias (common typo / old links)
+    return q.has('earnDevTools') || q.has('earnDexTools')
   }
   return false
 }
