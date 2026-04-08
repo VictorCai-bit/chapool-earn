@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import './App.css'
 import { getEarnRewardRulesSections } from './copy/earnRewardRules'
+import { EarnTestTimePanel } from './earn/EarnTestTimePanel'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 // Simulated: base CPP earned per 1 USDT per day (at no boost)
@@ -13,9 +14,17 @@ const BOOST_PER_VE_UNIT = 1         // boost numerator
 const BOOST_VE_PRECISION = 10       // divisor — 10 veCPOT units = 1 bps
 const MAX_VECPOT_BOOST_BPS = 500    // +5% cap
 
+function earnDevToolsVisible(): boolean {
+  if (import.meta.env.DEV) return true
+  if (import.meta.env.VITE_SHOW_EARN_TEST_TOOLS === 'true') return true
+  if (typeof window !== 'undefined') {
+    return new URLSearchParams(window.location.search).has('earnDevTools')
+  }
+  return false
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Sheet = null | 'deposit' | 'lock' | 'nft' | 'rules'
+type Sheet = null | 'deposit' | 'lock' | 'nft' | 'rules' | 'testTime'
 type DepositMode = 'deposit' | 'withdraw'
 type LockDuration = 30 | 90 | 180 | 360
 type Lang = 'zh' | 'en'
@@ -106,6 +115,7 @@ const T = {
     nftStakedNote: '注意：正在质押的 NFT 无法激活 Earn 加速（避免双重收益）。',
     goMarketplace: '去 Marketplace',
     close: '关闭',
+    testTimeDevBtn: '测试时间',
     // rules sheet
     rulesTitle: '收益规则说明',
     rulesS1Title: '一、基本机制',
@@ -224,6 +234,7 @@ const T = {
     nftStakedNote: 'Note: NFTs currently staked cannot be activated for Earn boost (no double-dipping).',
     goMarketplace: 'Open Marketplace',
     close: 'Close',
+    testTimeDevBtn: 'Test time',
     // rules sheet
     rulesTitle: 'How Earn Works',
     rulesS1Title: '1. How rewards work',
@@ -791,6 +802,16 @@ export default function App() {
       <header className="app-header">
         <strong className="brand">{t.header}</strong>
         <div className="header-right">
+          {earnDevToolsVisible() && (
+            <button
+              type="button"
+              className="dev-tools-btn"
+              onClick={() => setSheet('testTime')}
+              aria-label={t.testTimeDevBtn}
+            >
+              ⏱
+            </button>
+          )}
           <button className="info-btn" onClick={() => setSheet('rules')} aria-label="Earn rules">
             !
           </button>
@@ -1000,6 +1021,10 @@ export default function App() {
 
       <BottomSheet open={sheet === 'rules'} onClose={closeSheet}>
         <RulesSheet lang={lang} onClose={closeSheet} />
+      </BottomSheet>
+
+      <BottomSheet open={sheet === 'testTime'} onClose={closeSheet}>
+        <EarnTestTimePanel lang={lang} onClose={closeSheet} />
       </BottomSheet>
     </div>
   )

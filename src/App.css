@@ -919,3 +919,83 @@
   border-radius: 8px;
   border: 1px dashed var(--border);
 }
+
+.dev-tools-btn {
+  border: 1px solid rgba(240, 180, 41, 0.35);
+  background: rgba(240, 180, 41, 0.08);
+  color: #f0b429;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.test-time-panel {
+  padding: 4px 0 12px;
+}
+
+.test-time-note {
+  font-size: 12px;
+  color: var(--text-soft);
+  line-height: 1.45;
+  margin: 0 0 14px;
+}
+
+.test-time-account {
+  font-size: 12px;
+  color: var(--text-soft);
+  margin: 0 0 12px;
+  word-break: break-all;
+}
+
+.test-time-offsets {
+  font-size: 12px;
+  color: var(--text-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.test-time-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.test-time-custom {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.test-time-input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-h);
+  font-size: 14px;
+}
+
+.test-time-log {
+  margin-top: 12px;
+  padding: 10px;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  max-height: 160px;
+  overflow: auto;
+}
